@@ -3,9 +3,9 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-// 🔴 PASTE YOUR EXACT SUPABASE URL AND KEY HERE:
-const supabaseUrl = 'https://wdoclxhjtvueabhkvywd.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indkb2NseGhqdHZ1ZWFiaGt2eXdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNzE4MjMsImV4cCI6MjA4OTY0NzgyM30.ACiDNdlXNzLEhSwnhjHdx135FwOmag89sjmt6jyeQWw';
+// 🚀 SECURE: Pulling keys from your .env file
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
