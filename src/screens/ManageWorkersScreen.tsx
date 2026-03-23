@@ -77,19 +77,39 @@ export default function ManageWorkersScreen() {
         }
 
         setIsSaving(true);
-        const { error } = await supabase.from('profiles').update({ name: editName.trim(), mobile: editMobile.trim(), gender: editGender }).eq('id', selectedWorker.id);
+
+        // 1. Update the Name, Mobile, and Gender in the Database
+        const { error } = await supabase.from('profiles').update({
+            name: editName.trim(),
+            mobile: editMobile.trim(),
+            gender: editGender
+        }).eq('id', selectedWorker.id);
 
         if (error) {
             Toast.show({ type: 'error', text1: 'Update Failed', text2: error.message });
-        } else {
-            if (editPassword.length > 0) {
-                Alert.alert("Profile Saved!", "Name and Mobile updated.\n\nNote: Force-changing a password requires backend Edge Functions.");
-            } else {
-                Toast.show({ type: 'success', text1: 'Employee Updated!' });
-            }
-            setIsEditModalVisible(false);
-            fetchWorkers();
+            setIsSaving(false);
+            return;
         }
+
+        // 2. If the Admin typed a new password, call the Edge Function!
+        if (editPassword.length > 0) {
+            Toast.show({ type: 'info', text1: 'Updating Password...', text2: 'Please wait.' });
+
+            const { error: funcError } = await supabase.functions.invoke('reset-worker-password', {
+                body: { workerId: selectedWorker.id, newPassword: editPassword }
+            });
+
+            if (funcError) {
+                Toast.show({ type: 'error', text1: 'Password Failed', text2: funcError.message });
+            } else {
+                Toast.show({ type: 'success', text1: 'Employee Updated!', text2: 'Profile and password saved successfully.' });
+            }
+        } else {
+            Toast.show({ type: 'success', text1: 'Employee Updated!' });
+        }
+
+        setIsEditModalVisible(false);
+        fetchWorkers();
         setIsSaving(false);
     };
 
