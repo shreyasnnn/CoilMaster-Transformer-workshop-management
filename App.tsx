@@ -10,6 +10,7 @@ import { theme } from './src/theme/colors';
 
 // Screens
 import DashboardScreen from './src/screens/DashboardScreen';
+import CalculatorSelectionScreen from './src/screens/CalculatorSelectionScreen'; // 🚀 NEW IMPORT
 import CalculatorScreen from './src/screens/CalculatorScreen';
 import JobDetailsScreen from './src/screens/JobDetailsScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -23,14 +24,13 @@ import OrdersScreen from './src/screens/OrdersScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// 🚀 THE NEW BOTTOM TAB NAVIGATOR
 function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0F172A', // Dark solid color
+          backgroundColor: '#0F172A',
           borderTopWidth: 0,
           elevation: 20,
           height: 70,
@@ -41,7 +41,6 @@ function MainTabNavigator() {
         tabBarInactiveTintColor: theme.textMuted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginTop: 4 },
 
-        // Dynamic icons based on the tab name
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'grid-outline';
 
@@ -89,12 +88,13 @@ export default function App() {
         >
           {session && session.user ? (
             <>
-              {/* 🚀 Main App is now the Tab Navigator */}
               <Stack.Screen name="MainTabs" component={MainTabNavigator} options={{ headerShown: false }} />
-
-              {/* Screens that hide the bottom bar when opened */}
               <Stack.Screen name="Setup" component={SetupScreen} options={{ headerShown: false }} />
+              
+              {/* 🚀 NEW: The Selection Hub */}
+              <Stack.Screen name="CalculatorSelection" component={CalculatorSelectionScreen} options={{ title: 'Select Engine' }} />
               <Stack.Screen name="Calculator" component={CalculatorScreen} options={{ title: 'Design Wizard' }} />
+              
               <Stack.Screen name="JobDetails" component={JobDetailsScreen} options={{ title: 'Work Order' }} />
               <Stack.Screen name="AddWorker" component={AddWorkerScreen} options={{ title: 'Add Employee' }} />
             </>

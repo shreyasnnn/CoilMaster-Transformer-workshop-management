@@ -1,13 +1,8 @@
 // src/screens/CalculatorScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
-    StyleSheet,
-    Text,
-    View,
-    ScrollView,
-    TouchableOpacity,
-    ActivityIndicator,
-    Modal
+    StyleSheet, Text, View, ScrollView, TouchableOpacity,
+    ActivityIndicator, Modal
 } from 'react-native';
 import { calculateEICore } from '../utils/transformerMath';
 import { theme } from '../theme/colors';
@@ -17,7 +12,10 @@ import { supabase } from '../services/supabase';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function CalculatorScreen() {
+export default function CalculatorScreen({ route }: any) {
+    // 🚀 NEW: Grab the selected type from the navigation route
+    const transformerType = route?.params?.transformerType || 'EI Core';
+
     const [vIn, setVIn] = useState('220');
     const [vOut, setVOut] = useState('30');
     const [amps, setAmps] = useState('10');
@@ -30,15 +28,13 @@ export default function CalculatorScreen() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [jobName, setJobName] = useState('');
 
-    // 🚀 THE FIX: We actually need to store the profile here!
     const [userProfile, setUserProfile] = useState<any>(null);
 
     useEffect(() => {
         setIsSaved(false);
-        fetchUserProfile(); // 🚀 Fetch it when the screen loads
+        fetchUserProfile();
     }, [vIn, vOut, amps, bobbinLength]);
 
-    // 🚀 THE FIX: Function to grab the logged-in user's profile
     const fetchUserProfile = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -72,7 +68,6 @@ export default function CalculatorScreen() {
             return;
         }
 
-        // 🚀 Safe check: Make sure profile is loaded before saving!
         if (!userProfile) {
             Toast.show({ type: 'error', text1: 'Loading', text2: 'Still loading user data, please wait.' });
             return;
@@ -81,12 +76,12 @@ export default function CalculatorScreen() {
         setIsModalVisible(false);
         setIsSaving(true);
 
-        // 🚀 MULTI-TENANCY: Assign to the correct Admin's workshop
         const workshopId = userProfile.role === 'admin' ? userProfile.id : userProfile.admin_id;
 
         const { error } = await supabase.from('jobs').insert([
             {
-                admin_id: workshopId, // 🚀 Stamped with the workshop ID!
+                admin_id: workshopId,
+                transformer_type: transformerType, // 🚀 NEW: Save the core type!
                 specs: {
                     vIn: Number(vIn),
                     vOut: Number(vOut),
@@ -111,7 +106,7 @@ export default function CalculatorScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.headerTitle}>Industrial Refinement</Text>
+            <Text style={styles.headerTitle}>{transformerType} Engine</Text>
             <Text style={styles.headerSubtitle}>Design Specifications</Text>
 
             <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: 40 }}>

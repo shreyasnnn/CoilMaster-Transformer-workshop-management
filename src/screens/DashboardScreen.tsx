@@ -203,7 +203,7 @@ export default function DashboardScreen({ navigation }: any) {
                 </GlassCard>
 
                 <View style={styles.cardSpacing}>
-                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.primaryGlow }]} onPress={() => navigation.navigate('Calculator')}>
+                    <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.primaryGlow }]} onPress={() => navigation.navigate('CalculatorSelection')}>
                         <Text style={styles.actionButtonText}>Transformer Calculator</Text>
                     </TouchableOpacity>
                 </View>

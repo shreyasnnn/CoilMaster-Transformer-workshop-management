@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
     StyleSheet, Text, View, TouchableOpacity,
-    ActivityIndicator, KeyboardAvoidingView, Platform
+    ActivityIndicator, KeyboardAvoidingView, Platform, Modal
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../services/supabase';
@@ -12,18 +12,22 @@ import { GlassInput } from '../components/GlassInput';
 
 export default function LoginScreen() {
     const [isAdminMode, setIsAdminMode] = useState(false);
-
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
 
     // Auth States
     const [email, setEmail] = useState('');
-    const [mobile, setMobile] = useState(''); // 🚀 NEW: State for Employee Phone Number
+    const [mobile, setMobile] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
 
+    // 🚀 NEW: OTP Recovery Modal States
+    const [recoveryStep, setRecoveryStep] = useState<'none' | 'email' | 'otp'>('none');
+    const [recoveryEmail, setRecoveryEmail] = useState('');
+    const [otpCode, setOtpCode] = useState('');
+    const [newRecoveryPassword, setNewRecoveryPassword] = useState('');
+
     const handleAuth = async () => {
-        // 🚀 SMART VALIDATION & EMAIL CONSTRUCTION
         let authEmail = '';
 
         if (isAdminMode) {
@@ -37,7 +41,6 @@ export default function LoginScreen() {
                 Toast.show({ type: 'error', text1: 'Required', text2: 'Please enter mobile number and password.' });
                 return;
             }
-            // 🚀 THE MAGIC TRICK: Convert phone number to a hidden system email!
             authEmail = `${mobile.trim()}@twm.local`;
         }
 
@@ -45,17 +48,15 @@ export default function LoginScreen() {
         try {
             if (isLogin) {
                 const { data, error } = await supabase.auth.signInWithPassword({
-                    email: authEmail, // Use our dynamically constructed email
+                    email: authEmail,
                     password: password
                 });
                 if (error) throw error;
 
-                // Flip their status to online!
                 if (data.user) {
                     await supabase.from('profiles').update({ is_online: true }).eq('id', data.user.id);
                 }
             } else {
-                // Admin Registration Flow
                 if (!name) {
                     Toast.show({ type: 'error', text1: 'Name Required' });
                     setIsLoading(false);
@@ -76,11 +77,66 @@ export default function LoginScreen() {
         }
     };
 
+    // 🚀 OTP PHASE 1: Send the 6-digit code to the email
+    const handleSendOtp = async () => {
+        if (!recoveryEmail.trim()) {
+            Toast.show({ type: 'error', text1: 'Email Required' });
+            return;
+        }
+
+        setIsLoading(true);
+        const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail.trim());
+
+        if (error) {
+            Toast.show({ type: 'error', text1: 'Error', text2: error.message });
+        } else {
+            Toast.show({ type: 'success', text1: 'Code Sent!', text2: 'Check your email for the 6-digit code.' });
+            setRecoveryStep('otp'); // Move to the next screen in the modal
+        }
+        setIsLoading(false);
+    };
+
+    // 🚀 OTP PHASE 2: Verify the code and update the password directly
+    const handleVerifyAndReset = async () => {
+        if (!otpCode.trim() || !newRecoveryPassword.trim()) {
+            Toast.show({ type: 'error', text1: 'Required', text2: 'Please enter the code and a new password.' });
+            return;
+        }
+
+        setIsLoading(true);
+        
+        // Step A: Verify the 6-digit code (This temporarily logs them in behind the scenes)
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+            email: recoveryEmail.trim(),
+            token: otpCode.trim(),
+            type: 'recovery'
+        });
+
+        if (verifyError) {
+            Toast.show({ type: 'error', text1: 'Invalid Code', text2: verifyError.message });
+            setIsLoading(false);
+            return;
+        }
+
+        // Step B: Now that they are verified, update the password!
+        const { error: updateError } = await supabase.auth.updateUser({ 
+            password: newRecoveryPassword 
+        });
+
+        if (updateError) {
+            Toast.show({ type: 'error', text1: 'Update Failed', text2: updateError.message });
+        } else {
+            Toast.show({ type: 'success', text1: 'Password Updated!', text2: 'You can now log in with your new password.' });
+            setRecoveryStep('none'); // Close modal
+            setOtpCode('');
+            setNewRecoveryPassword('');
+            setPassword(''); // Clear the main login form
+        }
+        setIsLoading(false);
+    };
+
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={styles.headerContainer}>
                 <Text style={styles.logoText}>Industrial Refinement</Text>
                 <Text style={styles.subtitle}>Workshop Management System</Text>
@@ -112,7 +168,6 @@ export default function LoginScreen() {
                     <GlassInput label="NAME" value={name} onChangeText={setName} placeholder="Shashi" keyboardType='default' autoCapitalize='words' autoCorrect={false} />
                 )}
 
-                {/* 🚀 CONDITIONAL INPUT RENDERING */}
                 {!isAdminMode ? (
                     <GlassInput label="MOBILE NUMBER" value={mobile} onChangeText={setMobile} placeholder="e.g. 9876543210" keyboardType="phone-pad" />
                 ) : (
@@ -120,6 +175,18 @@ export default function LoginScreen() {
                 )}
 
                 <GlassInput label="PASSWORD" value={password} onChangeText={setPassword} secureTextEntry keyboardType='default' />
+
+                {isAdminMode && isLogin && (
+                    <TouchableOpacity 
+                        onPress={() => {
+                            setRecoveryEmail(email); // Pre-fill if they already typed it
+                            setRecoveryStep('email');
+                        }} 
+                        style={{ alignSelf: 'flex-end', marginBottom: 15, marginTop: -5 }}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                )}
 
                 <TouchableOpacity style={styles.submitButton} onPress={handleAuth} disabled={isLoading}>
                     {isLoading ? <ActivityIndicator color={theme.background} /> : <Text style={styles.submitButtonText}>{isLogin ? 'LOGIN' : 'SIGN UP'}</Text>}
@@ -134,6 +201,48 @@ export default function LoginScreen() {
                     </TouchableOpacity>
                 )}
             </GlassCard>
+
+            {/* 🚀 OTP RECOVERY MODAL */}
+            <Modal animationType="slide" transparent={true} visible={recoveryStep !== 'none'} onRequestClose={() => setRecoveryStep('none')}>
+                <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                    <View style={styles.modalContent}>
+                        
+                        {/* HEADER */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <Text style={styles.modalTitle}>Reset Password</Text>
+                            <TouchableOpacity onPress={() => setRecoveryStep('none')}>
+                                <Text style={{ color: theme.textMuted, fontSize: 16 }}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* STEP 1: ASK FOR EMAIL */}
+                        {recoveryStep === 'email' && (
+                            <>
+                                <Text style={styles.modalSubtitle}>Enter your admin email. We will send you a 6-digit code.</Text>
+                                <GlassInput label="ADMIN EMAIL" value={recoveryEmail} onChangeText={setRecoveryEmail} keyboardType="email-address" autoCapitalize="none" />
+                                <TouchableOpacity style={styles.submitButton} onPress={handleSendOtp} disabled={isLoading}>
+                                    {isLoading ? <ActivityIndicator color={theme.background} /> : <Text style={styles.submitButtonText}>SEND CODE</Text>}
+                                </TouchableOpacity>
+                            </>
+                        )}
+
+                        {/* STEP 2: VERIFY CODE & NEW PASSWORD */}
+                        {recoveryStep === 'otp' && (
+                            <>
+                                <Text style={styles.modalSubtitle}>Enter the 6-digit code sent to {recoveryEmail}</Text>
+                                <GlassInput label="6-DIGIT CODE" value={otpCode} onChangeText={setOtpCode} keyboardType="number-pad" placeholder="e.g. 123456" />
+                                <GlassInput label="NEW PASSWORD" value={newRecoveryPassword} onChangeText={setNewRecoveryPassword} secureTextEntry />
+                                
+                                <TouchableOpacity style={styles.submitButton} onPress={handleVerifyAndReset} disabled={isLoading}>
+                                    {isLoading ? <ActivityIndicator color={theme.background} /> : <Text style={styles.submitButtonText}>UPDATE PASSWORD</Text>}
+                                </TouchableOpacity>
+                            </>
+                        )}
+
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
         </KeyboardAvoidingView>
     );
 }
@@ -154,5 +263,11 @@ const styles = StyleSheet.create({
     submitButtonText: { color: theme.background, fontWeight: 'bold', fontSize: 16 },
     toggleButton: { marginTop: 20, alignItems: 'center' },
     toggleText: { color: theme.textMuted },
-    toggleTextBold: { color: theme.primaryGlow, fontWeight: 'bold' }
+    toggleTextBold: { color: theme.primaryGlow, fontWeight: 'bold' },
+    forgotPasswordText: { color: theme.primaryGlow, fontSize: 12, fontWeight: '600' },
+    
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', padding: 20, justifyContent: 'center' },
+    modalContent: { width: '100%', padding: 30, backgroundColor: '#0F172A', borderRadius: 16, borderColor: theme.glassBorder, borderWidth: 1 },
+    modalTitle: { color: theme.textMain, fontSize: 22, fontWeight: 'bold' },
+    modalSubtitle: { color: theme.textMuted, fontSize: 14, marginBottom: 20, lineHeight: 20 },
 });
